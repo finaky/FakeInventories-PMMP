@@ -15,11 +15,9 @@ use pocketmine\block\tile\TileFactory;
 use pocketmine\block\VanillaBlocks;
 use pocketmine\inventory\SimpleInventory;
 use pocketmine\item\Item;
-use pocketmine\item\ItemFactory;
-use pocketmine\item\ItemIds;
 use pocketmine\math\Vector3;
 use pocketmine\nbt\tag\CompoundTag;
-use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
+use pocketmine\network\mcpe\convert\TypeConverter;
 use pocketmine\network\mcpe\protocol\BlockActorDataPacket;
 use pocketmine\network\mcpe\protocol\InventorySlotPacket;
 use pocketmine\network\mcpe\protocol\types\BlockPosition;
@@ -82,7 +80,7 @@ abstract class FakeInventory extends SimpleInventory implements BlockInventory {
     private function blockPacket(Vector3 $pos, Block $block) : UpdateBlockPacket {
         return UpdateBlockPacket::create(
             new BlockPosition($pos->x, $pos->y, $pos->z),
-            RuntimeBlockMapping::getInstance()->toRuntimeId($block->getFullId()),
+            TypeConverter::getInstance()->getBlockTranslator()->internalIdToNetworkId($block->getStateId()),
             0,
             0
         );
@@ -186,45 +184,6 @@ abstract class FakeInventory extends SimpleInventory implements BlockInventory {
         });
     }
 
-//    protected function inventoryPacket(Vector3 $position) : DataPacket {
-//        $pk = new UpdateBlockPacket();
-//        $pk->x = $position->x;
-//        $pk->y = $position->y;
-//        $pk->z = $position->z;
-//        $pk->flags = UpdateBlockPacket::FLAG_ALL;
-//        $pk->blockRuntimeId = BlockFactory::toStaticRuntimeId(54);
-//
-//        $this->chests[] = $position;
-//        return $pk;
-//    }
-//
-//    protected function inventoryNamePacket(Vector3 $position) : DataPacket {
-//        $writer = new NetworkLittleEndianNBTStream();
-//
-//        $pk = new BlockActorDataPacket;
-//        $pk->x = $position->x;
-//        $pk->y = $position->y;
-//        $pk->z = $position->z;
-//
-//        ($tag = new CompoundTag())->setString('CustomName', $this->title);
-//        $pk->namedtag = $writer->write($tag);
-//        return $pk;
-//    }
-//
-//    protected function pairInventories(Vector3 $position) : DataPacket {
-//        $tag = new CompoundTag();
-//        $tag->setInt('pairx', $position->x);
-//        $tag->setInt('pairz', $position->z);
-//
-//        $writer = new NetworkLittleEndianNBTStream();
-//        $pk = new BlockActorDataPacket;
-//        $pk->x = ($pairPos = $position->add(1))->x;
-//        $pk->y = $pairPos->y;
-//        $pk->z = $pairPos->z;
-//        $pk->namedtag = $writer->write($tag);
-//        return $pk;
-//    }
-
     /**
      * @param Player[] $players
      * @param Vector3 $vector3
@@ -264,9 +223,9 @@ abstract class FakeInventory extends SimpleInventory implements BlockInventory {
                 }
             }
         } else {
-            $x = round(($players[0]->x + $players[1]->x) / 2);
-            $y = round(($players[0]->y + $players[1]->y) / 2);
-            $z = round(($players[0]->z + $players[1]->z) / 2);
+            $x = round(($players[0]->getPosition()->x + $players[1]->getPosition()->x) / 2);
+            $y = round(($players[0]->getPosition()->y + $players[1]->getPosition()->y) / 2);
+            $z = round(($players[0]->getPosition()->z + $players[1]->getPosition()->z) / 2);
 
             $chestPosition = (new Vector3($x, $y, $z))->floor();
         }
@@ -282,20 +241,20 @@ abstract class FakeInventory extends SimpleInventory implements BlockInventory {
         $player->getNetworkSession()->sendDataPacket($packet);
     }
 
-    public function fill(int $itemId = ItemIds::STAINED_GLASS_PANE, int $damageId = 7) : void {
+    public function fill(Item $item) : void {
         for($i = 0; $i < $this->getSize(); $i++)
             if($this->isSlotEmpty($i)) {
-                $this->setItem($i, ItemFactory::getInstance()->get($itemId, $damageId)->setCustomName(" "));
+                $this->setItem($i, $item->setCustomName(" "));
             }
     }
 
-    public function fillWithPattern(array $pattern, int $itemId = ItemIds::STAINED_GLASS_PANE, int $damageId = 7) : void {
+    public function fillWithPattern(array $pattern, Item $item) : void {
         foreach($pattern as $slot)
-            $this->setItem($slot, ItemFactory::getInstance()->get($itemId, $damageId)->setCustomName(" "));
+            $this->setItem($slot,  $item->setCustomName(" "));
     }
 
     public function setItem(int $index, Item $item, bool $send = true, bool $reset = false) : void {
-        if($reset && $item->getId() !== VanillaBlocks::AIR()->asItem() && $item->getCustomName() !== "") {
+        if($reset && $item->getTypeId() !== VanillaBlocks::AIR()->asItem()->getTypeId() && $item->getCustomName() !== "") {
             $item->setCustomName("§r" . $item->getCustomName());
         }
 
